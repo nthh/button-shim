@@ -84,6 +84,7 @@ _t_poll = None
 _running = False
 
 _states = 0b00011111
+_last_hold = 0
 
 class Handler():
     def __init__(self):
@@ -103,7 +104,7 @@ class Handler():
 _handlers = [Handler() for x in range(NUM_BUTTONS)]
 
 def _run():
-    global _running, _states
+    global _running, _states, _last_hold
     _running = True
     _last_states = 0b00011111
     _errors = 0
@@ -143,13 +144,13 @@ def _run():
                 handler.t_pressed = time.time()
                 handler.hold_fired = False
 
-                if callable(handler.press):
+                if callable(handler.press) and (handler.t_pressed - _last_hold) > 3:
                     handler.t_repeat = time.time()
                     Thread(target=handler.press, args=(x, True)).start()
 
                 continue
 
-            if last < curr and callable(handler.release):
+            if last < curr and callable(handler.release) and (time.time() - _last_hold) > 3:
                 Thread(target=handler.release, args=(x, False)).start()
                 continue
 
@@ -157,6 +158,7 @@ def _run():
                 if callable(handler.hold) and handler.hold_fired == False and (time.time() - handler.t_pressed) > handler.hold_time:
                     Thread(target=handler.hold, args=(x,)).start()
                     handler.hold_fired = True
+                    _last_hold = time.time()
 
                 if handler.repeat and callable(handler.press) and (time.time() - handler.t_repeat) > handler.repeat_time:
                     _handlers[x].t_repeat = time.time()
@@ -405,7 +407,7 @@ if __name__ == "__main__":
     @on_release([BUTTON_A, BUTTON_B, BUTTON_C, BUTTON_D, BUTTON_E])
     def handle_release(button, state):
         print("RELEASE: Button {} ({}) is {}".format(button, NAMES[button], state))
-            
+
     while True:
         hue = (time.time() * 100 % 360) / 360.0
         r, g, b = [int(c * 255) for c in hsv_to_rgb(hue, 1.0, 1.0)]
